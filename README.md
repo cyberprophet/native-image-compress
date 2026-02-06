@@ -15,8 +15,9 @@ Supports Android, iOS, macOS, Windows, and Web.
 
 ## Supported formats
 
-- JPEG
-- PNG
+- JPEG (lossy, quality control)
+- PNG (lossless, quality ignored)
+- WebP (lossy, quality control)
 
 ## Usage
 
@@ -24,7 +25,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_native_image_compress: ^0.1.0
+  flutter_native_image_compress: ^0.2.0
 ```
 
 Import and compress in memory:
@@ -52,11 +53,22 @@ final Uint8List outputBytes =
     await FlutterNativeImageCompress.compressFile('/path/to/image.jpg', options);
 ```
 
+## Error Handling
+
+This plugin uses graceful error handling. If compression fails for any reason:
+- The original image data is returned unchanged
+- An error message is logged for debugging
+- No exceptions are thrown to the caller
+- Your application continues functioning normally
+
+This ensures robust behavior even with corrupted or unsupported image data.
+
 ## Notes
 
-- PNG is resized but not lossy compressed.
-- Only JPEG and PNG are supported.
-- Exceptions are thrown on invalid input or unsupported formats.
+- PNG is resized but not lossy compressed (lossless format).
+- WebP and JPEG support quality control (0-100, default 70).
+- Supported formats: JPEG, PNG, WebP.
+- Compression failures return original data instead of throwing exceptions.
 
 ## Publishing
 

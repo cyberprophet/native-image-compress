@@ -22,133 +22,172 @@ public class FlutterNativeImageCompressPlugin: NSObject, FlutterPlugin {
     }
   }
 
-  // MARK: - Compress from bytes
-  private func handleCompress(call: FlutterMethodCall, result: @escaping FlutterResult) {
-    guard let args = call.arguments as? [String: Any],
-          let data = args["data"] as? FlutterStandardTypedData else {
-      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing required 'data' argument", details: nil))
-      return
-    }
-    
-    let maxWidth = (args["maxWidth"] as? NSNumber)?.intValue
-    let maxHeight = (args["maxHeight"] as? NSNumber)?.intValue
-    let quality = (args["quality"] as? NSNumber)?.intValue ?? 70
-    
-    let imageData = data.data
-    
-    DispatchQueue.global(qos: .userInitiated).async {
-      do {
-        let compressedData = try self.compressImageData(imageData, maxWidth: maxWidth, maxHeight: maxHeight, quality: quality)
-        DispatchQueue.main.async {
-          result(FlutterStandardTypedData(bytes: compressedData))
-        }
-      } catch let error as CompressError {
-        DispatchQueue.main.async {
-          result(FlutterError(code: error.code, message: error.message, details: nil))
-        }
-      } catch {
-        DispatchQueue.main.async {
-          result(FlutterError(code: "COMPRESSION_FAILED", message: error.localizedDescription, details: nil))
+   // MARK: - Compress from bytes
+   private func handleCompress(call: FlutterMethodCall, result: @escaping FlutterResult) {
+     guard let args = call.arguments as? [String: Any],
+           let data = args["data"] as? FlutterStandardTypedData else {
+       result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing required 'data' argument", details: nil))
+       return
+     }
+     
+     let maxWidth = (args["maxWidth"] as? NSNumber)?.intValue
+     let maxHeight = (args["maxHeight"] as? NSNumber)?.intValue
+     let quality = (args["quality"] as? NSNumber)?.intValue ?? 70
+     
+     let imageData = data.data
+     
+     DispatchQueue.global(qos: .userInitiated).async {
+       do {
+         let compressedData = try self.compressImageData(imageData, maxWidth: maxWidth, maxHeight: maxHeight, quality: quality)
+         DispatchQueue.main.async {
+           result(FlutterStandardTypedData(bytes: compressedData))
+         }
+       } catch let error as CompressError {
+         print("Compression failed: \(error.message). Returning original data.")
+         DispatchQueue.main.async {
+           result(FlutterStandardTypedData(bytes: imageData))
+         }
+       } catch {
+         print("Compression failed: \(error.localizedDescription). Returning original data.")
+         DispatchQueue.main.async {
+           result(FlutterStandardTypedData(bytes: imageData))
+         }
+       }
+     }
+   }
+
+   // MARK: - Compress from file
+   private func handleCompressFile(call: FlutterMethodCall, result: @escaping FlutterResult) {
+     guard let args = call.arguments as? [String: Any],
+           let path = args["path"] as? String else {
+       result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing required 'path' argument", details: nil))
+       return
+     }
+     
+     let maxWidth = (args["maxWidth"] as? NSNumber)?.intValue
+     let maxHeight = (args["maxHeight"] as? NSNumber)?.intValue
+     let quality = (args["quality"] as? NSNumber)?.intValue ?? 70
+     
+     DispatchQueue.global(qos: .userInitiated).async {
+       do {
+         let fileURL = URL(fileURLWithPath: path)
+         let imageData = try Data(contentsOf: fileURL)
+         
+         let compressedData = try self.compressImageData(imageData, maxWidth: maxWidth, maxHeight: maxHeight, quality: quality)
+         DispatchQueue.main.async {
+           result(FlutterStandardTypedData(bytes: compressedData))
+         }
+       } catch let error as CompressError {
+         print("Compression failed for file \(path): \(error.message). Returning original data.")
+         do {
+           let fileURL = URL(fileURLWithPath: path)
+           let originalData = try Data(contentsOf: fileURL)
+           DispatchQueue.main.async {
+             result(FlutterStandardTypedData(bytes: originalData))
+           }
+         } catch {
+           print("Failed to read original file: \(error.localizedDescription). Returning empty data.")
+           DispatchQueue.main.async {
+             result(FlutterStandardTypedData(bytes: Data()))
+           }
+         }
+       } catch {
+         print("Compression failed for file \(path): \(error.localizedDescription). Returning original data.")
+         do {
+           let fileURL = URL(fileURLWithPath: path)
+           let originalData = try Data(contentsOf: fileURL)
+           DispatchQueue.main.async {
+             result(FlutterStandardTypedData(bytes: originalData))
+           }
+         } catch {
+           print("Failed to read original file: \(error.localizedDescription). Returning empty data.")
+           DispatchQueue.main.async {
+             result(FlutterStandardTypedData(bytes: Data()))
+           }
+         }
+       }
+     }
+   }
+
+   // MARK: - Core compression logic
+   private func compressImageData(_ data: Data, maxWidth: Int?, maxHeight: Int?, quality: Int) throws -> Data {
+     let format = try detectFormat(data)
+     
+     guard let image = UIImage(data: data) else {
+       throw CompressError(code: "DECODE_FAILED", message: "Failed to decode image data")
+     }
+     
+     let (targetWidth, targetHeight) = calculateTargetDimensions(
+       originalWidth: Int(image.size.width),
+       originalHeight: Int(image.size.height),
+       maxWidth: maxWidth,
+       maxHeight: maxHeight
+     )
+     
+     let resizedImage: UIImage
+     if targetWidth != Int(image.size.width) || targetHeight != Int(image.size.height) {
+       resizedImage = resizeImage(image, to: CGSize(width: targetWidth, height: targetHeight))
+     } else {
+       resizedImage = image
+     }
+     
+      let compressedData: Data?
+      switch format {
+      case .jpeg:
+        compressedData = resizedImage.jpegData(compressionQuality: CGFloat(quality) / 100.0)
+      case .png:
+        compressedData = resizedImage.pngData()
+      case .webp:
+        // WebP compression using NSBitmapImageRep
+        let compressionFactor = CGFloat(quality) / 100.0
+        if let tiffData = resizedImage.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiffData) {
+          compressedData = bitmap.representation(using: .webp, properties: [.compressionFactor: compressionFactor])
+        } else {
+          compressedData = nil
         }
       }
-    }
-  }
+     
+     guard let result = compressedData else {
+       throw CompressError(code: "ENCODE_FAILED", message: "Failed to encode compressed image")
+     }
+     
+     return result
+   }
 
-  // MARK: - Compress from file
-  private func handleCompressFile(call: FlutterMethodCall, result: @escaping FlutterResult) {
-    guard let args = call.arguments as? [String: Any],
-          let path = args["path"] as? String else {
-      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing required 'path' argument", details: nil))
-      return
-    }
-    
-    let maxWidth = (args["maxWidth"] as? NSNumber)?.intValue
-    let maxHeight = (args["maxHeight"] as? NSNumber)?.intValue
-    let quality = (args["quality"] as? NSNumber)?.intValue ?? 70
-    
-    DispatchQueue.global(qos: .userInitiated).async {
-      do {
-        let fileURL = URL(fileURLWithPath: path)
-        let imageData = try Data(contentsOf: fileURL)
-        
-        let compressedData = try self.compressImageData(imageData, maxWidth: maxWidth, maxHeight: maxHeight, quality: quality)
-        DispatchQueue.main.async {
-          result(FlutterStandardTypedData(bytes: compressedData))
-        }
-      } catch let error as CompressError {
-        DispatchQueue.main.async {
-          result(FlutterError(code: error.code, message: error.message, details: nil))
-        }
-      } catch {
-        DispatchQueue.main.async {
-          result(FlutterError(code: "COMPRESSION_FAILED", message: error.localizedDescription, details: nil))
-        }
-      }
-    }
-  }
-
-  // MARK: - Core compression logic
-  private func compressImageData(_ data: Data, maxWidth: Int?, maxHeight: Int?, quality: Int) throws -> Data {
-    let format = try detectFormat(data)
-    
-    guard let image = UIImage(data: data) else {
-      throw CompressError(code: "DECODE_FAILED", message: "Failed to decode image data")
-    }
-    
-    let (targetWidth, targetHeight) = calculateTargetDimensions(
-      originalWidth: Int(image.size.width),
-      originalHeight: Int(image.size.height),
-      maxWidth: maxWidth,
-      maxHeight: maxHeight
-    )
-    
-    let resizedImage: UIImage
-    if targetWidth != Int(image.size.width) || targetHeight != Int(image.size.height) {
-      resizedImage = resizeImage(image, to: CGSize(width: targetWidth, height: targetHeight))
-    } else {
-      resizedImage = image
-    }
-    
-    let compressedData: Data?
-    switch format {
-    case .jpeg:
-      compressedData = resizedImage.jpegData(compressionQuality: CGFloat(quality) / 100.0)
-    case .png:
-      compressedData = resizedImage.pngData()
-    }
-    
-    guard let result = compressedData else {
-      throw CompressError(code: "ENCODE_FAILED", message: "Failed to encode compressed image")
-    }
-    
-    return result
-  }
-
-  // MARK: - Format detection
-  private enum ImageFormat {
-    case jpeg
-    case png
-  }
+   // MARK: - Format detection
+   private enum ImageFormat {
+     case jpeg
+     case png
+     case webp
+   }
 
    private func detectFormat(_ data: Data) throws -> ImageFormat {
      return try detectFormatByMagicBytes(data)
    }
 
-  private func detectFormatByMagicBytes(_ data: Data) throws -> ImageFormat {
-    if data.count >= 4 {
-      if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
-        return .png
-      }
-      if data[0] == 0xFF && data[1] == 0xD8 {
-        return .jpeg
-      }
-    }
+   private func detectFormatByMagicBytes(_ data: Data) throws -> ImageFormat {
+     if data.count >= 4 {
+       if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
+         return .png
+       }
+       if data[0] == 0xFF && data[1] == 0xD8 {
+         return .jpeg
+       }
+     }
 
-    throw CompressError(
-      code: "UNSUPPORTED_FORMAT",
-      message: "Unsupported image format. Only JPEG and PNG are supported."
-    )
-  }
+     if data.count >= 12 {
+       if data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 &&
+          data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
+         return .webp
+       }
+     }
+
+     throw CompressError(
+       code: "UNSUPPORTED_FORMAT",
+       message: "Unsupported image format. Only JPEG, PNG, and WebP are supported."
+     )
+   }
 
   // MARK: - Aspect ratio calculation
   private func calculateTargetDimensions(

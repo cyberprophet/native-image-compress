@@ -1,4 +1,6 @@
-import 'dart:typed_data';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import 'flutter_native_image_compress_platform_interface.dart';
 import 'src/compress_options.dart';
@@ -28,10 +30,20 @@ class FlutterNativeImageCompress {
   /// ```
   ///
   /// Returns compressed image data as [Uint8List].
-  ///
-  /// Throws [ImageCompressException] if compression fails.
-  static Future<Uint8List> compress(Uint8List data, CompressOptions options) {
-    return FlutterNativeImageCompressPlatform.instance.compress(data, options);
+  /// If compression fails, returns the original [data] unchanged.
+  static Future<Uint8List> compress(
+    Uint8List data,
+    CompressOptions options,
+  ) async {
+    try {
+      return await FlutterNativeImageCompressPlatform.instance.compress(
+        data,
+        options,
+      );
+    } catch (e) {
+      debugPrint('Image compression failed: $e. Returning original data.');
+      return data;
+    }
   }
 
   /// Compresses an image file from the filesystem.
@@ -47,12 +59,27 @@ class FlutterNativeImageCompress {
   /// ```
   ///
   /// Returns compressed image data as [Uint8List].
-  ///
-  /// Throws [ImageCompressException] if the file is not found or compression fails.
-  static Future<Uint8List> compressFile(String path, CompressOptions options) {
-    return FlutterNativeImageCompressPlatform.instance.compressFile(
-      path,
-      options,
-    );
+  /// If compression fails, returns the original file bytes unchanged.
+  static Future<Uint8List> compressFile(
+    String path,
+    CompressOptions options,
+  ) async {
+    try {
+      return await FlutterNativeImageCompressPlatform.instance.compressFile(
+        path,
+        options,
+      );
+    } catch (e) {
+      debugPrint(
+        'File compression failed for $path: $e. Returning original file bytes.',
+      );
+      try {
+        final file = File(path);
+        return await file.readAsBytes();
+      } catch (fileError) {
+        debugPrint('Failed to read original file: $fileError');
+        return Uint8List(0);
+      }
+    }
   }
 }

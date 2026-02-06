@@ -5,8 +5,8 @@
 
 import 'dart:async';
 import 'dart:js_interop';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
 
@@ -36,7 +36,7 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
     try {
       // Detect image format by magic bytes
       final format = _detectFormat(data);
-      final mimeType = format == 'jpeg' ? 'image/jpeg' : 'image/png';
+      final mimeType = _getMimeType(format);
 
       // Create blob from Uint8List
       final blob = web.Blob(
@@ -94,6 +94,11 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
         // Convert to blob
         final resultCompleter = Completer<Uint8List>();
 
+        // Determine quality parameter based on format
+        final qualityParam = _shouldApplyQuality(format)
+            ? (options.quality / 100.0).toJS
+            : null;
+
         canvas.toBlob(
           ((web.Blob? blob) {
             if (blob == null) {
@@ -141,7 +146,7 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
             reader.readAsArrayBuffer(blob);
           }).toJS,
           mimeType,
-          format == 'jpeg' ? (options.quality / 100.0).toJS : null,
+          qualityParam,
         );
 
         return await resultCompleter.future;
@@ -149,13 +154,13 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
         web.URL.revokeObjectURL(url);
       }
     } catch (e) {
+      // Graceful error handling: log error and return original data
       if (e is ImageCompressException) {
-        rethrow;
+        debugPrint('Web compression failed: ${e.message} (${e.code})');
+      } else {
+        debugPrint('Web compression failed with unexpected error: $e');
       }
-      throw ImageCompressException(
-        'Unexpected error during compression: $e',
-        'COMPRESSION_FAILED',
-      );
+      return data;
     }
   }
 
@@ -168,7 +173,7 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
   }
 
   /// Detects image format by magic bytes.
-  /// Returns 'jpeg' or 'png'.
+  /// Returns 'jpeg', 'png', or 'webp'.
   String _detectFormat(Uint8List data) {
     if (data.length < 4) {
       throw ImageCompressException('Invalid image data', 'INVALID_IMAGE');
@@ -187,8 +192,21 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
       return 'png';
     }
 
+    // WebP magic bytes: 52 49 46 46 [4 bytes] 57 45 42 50 (RIFF....WEBP)
+    if (data.length >= 12 &&
+        data[0] == 0x52 &&
+        data[1] == 0x49 &&
+        data[2] == 0x46 &&
+        data[3] == 0x46 &&
+        data[8] == 0x57 &&
+        data[9] == 0x45 &&
+        data[10] == 0x42 &&
+        data[11] == 0x50) {
+      return 'webp';
+    }
+
     throw ImageCompressException(
-      'Unsupported image format. Only JPEG and PNG are supported.',
+      'Unsupported image format. Only JPEG, PNG, and WebP are supported.',
       'UNSUPPORTED_FORMAT',
     );
   }
@@ -221,5 +239,26 @@ class FlutterNativeImageCompressWeb extends FlutterNativeImageCompressPlatform {
       width: (originalWidth * scale).round(),
       height: (originalHeight * scale).round(),
     );
+  }
+
+  /// Returns the MIME type for the given image format.
+  String _getMimeType(String format) {
+    switch (format) {
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/png';
+    }
+  }
+
+  /// Determines if quality parameter should be applied to the format.
+  /// JPEG and WebP support lossy compression with quality control.
+  /// PNG is lossless and ignores quality.
+  bool _shouldApplyQuality(String format) {
+    return format == 'jpeg' || format == 'webp';
   }
 }
