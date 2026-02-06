@@ -1,3 +1,7 @@
+## 0.1.1
+
+- Remove internal project management files from repository.
+
 ## 0.1.0
 
 - Initial release with native image resize/compression.
