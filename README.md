@@ -1,18 +1,64 @@
 # flutter_native_image_compress
 
-A new Flutter plugin project.
+Native image resize and compression for Flutter using platform APIs.
 
-## Getting Started
+Supports Android, iOS, macOS, Windows, and Web.
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/to/develop-plugins),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+## Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Resize to a max width/height while preserving aspect ratio
+- If the image is smaller than max, only compression is applied
+- JPEG quality control (0-100, default 70)
+- PNG is lossless (quality ignored)
+- Memory and file-path APIs
+- Native implementations per platform (no Dart compression)
 
-The plugin project was generated without specifying the `--platforms` flag, no platforms are currently supported.
-To add platforms, run `flutter create -t plugin --platforms <platforms> .` in this directory.
-You can also find a detailed instruction on how to add platforms in the `pubspec.yaml` at https://flutter.dev/to/pubspec-plugin-platforms.
+## Supported formats
+
+- JPEG
+- PNG
+
+## Usage
+
+Add the dependency:
+
+```yaml
+dependencies:
+  flutter_native_image_compress: ^0.1.0
+```
+
+Import and compress in memory:
+
+```dart
+import 'dart:typed_data';
+import 'package:flutter_native_image_compress/flutter_native_image_compress.dart';
+
+final Uint8List inputBytes = ...;
+final options = const CompressOptions(
+  maxWidth: 1024,
+  maxHeight: 1024,
+  quality: 70,
+);
+
+final Uint8List outputBytes =
+    await FlutterNativeImageCompress.compress(inputBytes, options);
+```
+
+Compress from file path:
+
+```dart
+final options = const CompressOptions(maxWidth: 1200, quality: 70);
+final Uint8List outputBytes =
+    await FlutterNativeImageCompress.compressFile('/path/to/image.jpg', options);
+```
+
+## Notes
+
+- PNG is resized but not lossy compressed.
+- Only JPEG and PNG are supported.
+- Exceptions are thrown on invalid input or unsupported formats.
+
+## Publishing
+
+This repository includes a GitHub Actions workflow that publishes to pub.dev on tag pushes.
+Tag format: `vX.Y.Z` (example: `v0.1.0`).
