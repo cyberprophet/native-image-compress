@@ -44,3 +44,6 @@ example/macos/Runner.xcworkspace/xcshareddata/swiftpm/
 
 # Windows temp files
 nul
+
+# Sisyphus project management
+.sisyphus/
