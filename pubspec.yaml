@@ -1,6 +1,6 @@
 name: flutter_native_image_compress
 description: "Native image resize and compression for Flutter (Android/iOS/macOS/Windows/Web)."
-version: 0.1.1
+version: 0.2.0
 homepage: https://github.com/cyberprophet/native-image-compress
 repository: https://github.com/cyberprophet/native-image-compress
 

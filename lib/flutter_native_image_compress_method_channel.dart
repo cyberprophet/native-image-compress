@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import 'flutter_native_image_compress_platform_interface.dart';
 import 'src/compress_options.dart';
-import 'src/image_compress_exception.dart';
 
 /// An implementation of [FlutterNativeImageCompressPlatform] that uses method channels.
 class MethodChannelFlutterNativeImageCompress
@@ -31,23 +30,21 @@ class MethodChannelFlutterNativeImageCompress
       });
 
       if (result == null) {
-        throw ImageCompressException(
-          'Platform returned null result',
-          'COMPRESSION_FAILED',
+        debugPrint(
+          'Platform returned null result for compress, returning original data',
         );
+        return data;
       }
 
       return result;
     } on PlatformException catch (e) {
-      throw ImageCompressException(
-        e.message ?? 'Image compression failed',
-        e.code,
+      debugPrint(
+        'Platform exception during compress: ${e.message} (${e.code})',
       );
+      return data;
     } catch (e) {
-      throw ImageCompressException(
-        'Unexpected error during compression: $e',
-        'COMPRESSION_FAILED',
-      );
+      debugPrint('Unexpected error during compress: $e');
+      return data;
     }
   }
 
@@ -63,23 +60,21 @@ class MethodChannelFlutterNativeImageCompress
           });
 
       if (result == null) {
-        throw ImageCompressException(
-          'Platform returned null result',
-          'COMPRESSION_FAILED',
+        debugPrint(
+          'Platform returned null result for compressFile, returning original file bytes',
         );
+        return Uint8List(0);
       }
 
       return result;
     } on PlatformException catch (e) {
-      throw ImageCompressException(
-        e.message ?? 'Image compression failed',
-        e.code,
+      debugPrint(
+        'Platform exception during compressFile: ${e.message} (${e.code})',
       );
+      return Uint8List(0);
     } catch (e) {
-      throw ImageCompressException(
-        'Unexpected error during compression: $e',
-        'COMPRESSION_FAILED',
-      );
+      debugPrint('Unexpected error during compressFile: $e');
+      return Uint8List(0);
     }
   }
 }
