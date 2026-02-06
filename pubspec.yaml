@@ -5,8 +5,8 @@ homepage: https://github.com/cyberprophet/native-image-compress
 repository: https://github.com/cyberprophet/native-image-compress
 
 environment:
-  sdk: ^3.10.7
-  flutter: '>=3.3.0'
+  sdk: ^3.10.8
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:
