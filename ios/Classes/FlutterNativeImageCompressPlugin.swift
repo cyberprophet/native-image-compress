@@ -130,20 +130,9 @@ public class FlutterNativeImageCompressPlugin: NSObject, FlutterPlugin {
     case png
   }
 
-  private func detectFormat(_ data: Data) throws -> ImageFormat {
-    if let source = CGImageSourceCreateWithData(data as CFData, nil),
-       let typeIdentifier = CGImageSourceCopyTypeIdentifier(source) {
-      let typeString = typeIdentifier as String
-      if typeString == "public.jpeg" || typeString == "public.jpg" {
-        return .jpeg
-      }
-      if typeString == "public.png" {
-        return .png
-      }
-    }
-
-    return try detectFormatByMagicBytes(data)
-  }
+   private func detectFormat(_ data: Data) throws -> ImageFormat {
+     return try detectFormatByMagicBytes(data)
+   }
 
   private func detectFormatByMagicBytes(_ data: Data) throws -> ImageFormat {
     if data.count >= 4 {

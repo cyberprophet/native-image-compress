@@ -113,7 +113,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.0.1"
+    version: "0.1.0"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
@@ -332,5 +332,5 @@ packages:
     source: hosted
     version: "5.15.0"
 sdks:
-  dart: ">=3.10.7 <4.0.0"
+  dart: ">=3.10.8 <4.0.0"
   flutter: ">=3.35.0"

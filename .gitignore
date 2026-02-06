@@ -31,3 +31,16 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 /build/
 /coverage/
+
+# CocoaPods
+example/ios/Podfile.lock
+example/macos/Podfile.lock
+
+# Swift Package Manager
+example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+example/ios/Runner.xcworkspace/xcshareddata/swiftpm/
+example/macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+example/macos/Runner.xcworkspace/xcshareddata/swiftpm/
+
+# Windows temp files
+nul
